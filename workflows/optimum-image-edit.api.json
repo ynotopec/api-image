@@ -1,0 +1,9 @@
+{
+  "note": "Starter template only. Replace with your real ComfyUI API-exported workflow JSON.",
+  "required_for_openwebui_editing": true,
+  "expected_mapping": {
+    "prompt_input": "Set in OpenWebUI workflow mapping",
+    "image_input": "Set in OpenWebUI workflow mapping",
+    "image_output": "Set in OpenWebUI workflow mapping"
+  }
+}

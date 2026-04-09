@@ -123,6 +123,97 @@ if [ ! -f "$ENV_FILE" ] && [ -f "$PROJECT_DIR/.env.example" ]; then
   cp "$PROJECT_DIR/.env.example" "$ENV_FILE"
 fi
 
+ensure_comfyui_api_key() {
+  [ -f "$ENV_FILE" ] || return 0
+  log "ensuring COMFYUI_API_KEY exists in .env"
+  python3 - "$ENV_FILE" <<'PY'
+import pathlib
+import re
+import secrets
+import sys
+
+env_path = pathlib.Path(sys.argv[1])
+text = env_path.read_text(encoding="utf-8")
+
+line_re = re.compile(r'^(COMFYUI_API_KEY=)(.*)$', re.MULTILINE)
+m = line_re.search(text)
+if m:
+    raw_val = m.group(2).strip()
+    cleaned = raw_val.strip('"').strip("'")
+    if cleaned:
+        print("[install] COMFYUI_API_KEY already set in .env")
+        raise SystemExit(0)
+    token = secrets.token_urlsafe(32)
+    text = text[:m.start()] + f'COMFYUI_API_KEY="{token}"' + text[m.end():]
+    env_path.write_text(text, encoding="utf-8")
+    print("[install] generated COMFYUI_API_KEY in .env")
+else:
+    token = secrets.token_urlsafe(32)
+    suffix = "" if text.endswith("\n") else "\n"
+    text = text + suffix + f'COMFYUI_API_KEY="{token}"\n'
+    env_path.write_text(text, encoding="utf-8")
+    print("[install] appended COMFYUI_API_KEY in .env")
+PY
+}
+
+bootstrap_workflow_json() {
+  local workflow_dir workflow_repo_url workflow_repo_ref workflow_json_path workflow_clone_dir
+  workflow_dir="$PROJECT_DIR/workflows"
+  workflow_repo_url="${WORKFLOW_REPO_URL:-}"
+  workflow_repo_ref="${WORKFLOW_REPO_REF:-main}"
+  workflow_json_path="${WORKFLOW_JSON_PATH:-}"
+
+  mkdir -p "$workflow_dir"
+
+  if [ ! -f "$workflow_dir/optimum-image-edit.api.json" ]; then
+    cat > "$workflow_dir/optimum-image-edit.api.json" <<'JSON'
+{
+  "note": "Starter template only. Replace with your real ComfyUI API-exported workflow JSON.",
+  "required_for_openwebui_editing": true,
+  "expected_mapping": {
+    "prompt_input": "Set in OpenWebUI workflow mapping",
+    "image_input": "Set in OpenWebUI workflow mapping",
+    "image_output": "Set in OpenWebUI workflow mapping"
+  }
+}
+JSON
+    log "created starter workflow JSON: workflows/optimum-image-edit.api.json"
+  fi
+
+  if [ -z "$workflow_repo_url" ]; then
+    return 0
+  fi
+
+  mkdir -p "$PROJECT_DIR/tmp"
+  workflow_clone_dir="$(mktemp -d "$PROJECT_DIR/tmp/workflow-repo.XXXXXX")"
+  trap 'rm -rf "$workflow_clone_dir"' RETURN
+
+  log "syncing workflow git repo: $workflow_repo_url (ref: $workflow_repo_ref)"
+  git clone --depth 1 --branch "$workflow_repo_ref" "$workflow_repo_url" "$workflow_clone_dir"
+
+  if [ -n "$workflow_json_path" ]; then
+    if [ ! -f "$workflow_clone_dir/$workflow_json_path" ]; then
+      echo "workflow json not found in repo: $workflow_json_path" >&2
+      exit 1
+    fi
+    cp "$workflow_clone_dir/$workflow_json_path" "$workflow_dir/$(basename "$workflow_json_path")"
+    log "copied workflow JSON from repo: $workflow_json_path"
+  else
+    if compgen -G "$workflow_clone_dir/*.json" >/dev/null; then
+      cp "$workflow_clone_dir"/*.json "$workflow_dir/"
+      log "copied workflow JSON files from repo root into workflows/"
+    elif compgen -G "$workflow_clone_dir/workflows/*.json" >/dev/null; then
+      cp "$workflow_clone_dir"/workflows/*.json "$workflow_dir/"
+      log "copied workflow JSON files from repo workflows/ into local workflows/"
+    else
+      log "no workflow JSON files found in workflow repo; keeping local starter template"
+    fi
+  fi
+}
+
+ensure_comfyui_api_key
+bootstrap_workflow_json
+
 log "validating torch/cuda"
 python - <<'PY'
 import os

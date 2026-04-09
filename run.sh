@@ -45,6 +45,11 @@ export NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-all}"
 EXTRA_ARGS=()
 [ -n "${COMFYUI_EXTRA_ARGS:-}" ] && read -r -a EXTRA_ARGS <<<"$COMFYUI_EXTRA_ARGS"
 
+API_KEY_ARGS=()
+if [ -n "${COMFYUI_API_KEY:-}" ]; then
+  API_KEY_ARGS=(--api-key "$COMFYUI_API_KEY")
+fi
+
 cd "$COMFYUI_DIR"
 exec python main.py \
   --listen "$IP" \
@@ -52,4 +57,5 @@ exec python main.py \
   --input-directory "${COMFYUI_INPUT_DIR:-$PROJECT_DIR/input}" \
   --output-directory "${COMFYUI_OUTPUT_DIR:-$PROJECT_DIR/output}" \
   --temp-directory "${COMFYUI_TEMP_DIR:-$PROJECT_DIR/tmp}" \
+  "${API_KEY_ARGS[@]}" \
   "${EXTRA_ARGS[@]}"
