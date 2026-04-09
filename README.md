@@ -19,6 +19,12 @@ OpenWebUI compatibility relies on:
 1. running ComfyUI through `source run.sh [IP] [PORT]`
 2. exporting the ComfyUI workflow in **API format**
 3. importing that workflow in OpenWebUI image generation / editing settings
+4. if enabled, using the same ComfyUI API key in both ComfyUI and OpenWebUI
+
+`install.sh` now helps bootstrap both:
+- API key generation in `.env` (if empty)
+- a starter workflow JSON in `workflows/`
+- optional workflow JSON sync from a git repository
 
 `run.sh` is responsible for the network bind. You should not need to pass raw ComfyUI network flags manually.
 
@@ -85,6 +91,17 @@ http://<your-comfyui-ip>:8188
 
 For **image editing**, your ComfyUI workflow must be exported in **API format** and mapped correctly in OpenWebUI.
 
+### ComfyUI API key (optional but recommended)
+
+You can protect ComfyUI API access with an API key:
+
+1. Set `COMFYUI_API_KEY` in `.env`.
+2. Start ComfyUI with `source run.sh ...` (the script passes `--api-key` automatically when this variable is set).
+3. In OpenWebUI ComfyUI connection settings, set **ComfyUI API Key** to the same value.
+
+If the key is set only on one side, requests will fail with authorization errors.
+If `COMFYUI_API_KEY` is empty, `./install.sh` generates one automatically in `.env`.
+
 ## Workflow notes for FLUX / FLUX.2 editors
 
 This project is intentionally **workflow-agnostic**.
@@ -103,6 +120,36 @@ Typical use cases:
 - Qwen image edit workflows
 
 Put your exported OpenWebUI-compatible API JSON files under `workflows/`.
+
+Do you need a workflow JSON for image edit?
+
+- **Yes** for OpenWebUI image editing via ComfyUI.
+- OpenWebUI needs a ComfyUI **API-format workflow JSON** to know which node receives:
+  - prompt text,
+  - input image (for edit/inpaint/img2img flows),
+  - and which node returns the output image.
+- API key and workflow JSON solve different problems:
+  - API key = authentication/security
+  - workflow JSON = execution graph/mapping
+
+### Workflow JSON bootstrap (local or git)
+
+`./install.sh` will always ensure a starter file exists:
+
+- `workflows/optimum-image-edit.api.json` (template starter, not a real graph)
+
+To pull real workflow JSON from git during install, set in `.env` before running:
+
+```bash
+WORKFLOW_REPO_URL="https://github.com/<owner>/<repo>.git"
+WORKFLOW_REPO_REF="main"                  # optional, defaults to main
+WORKFLOW_JSON_PATH="workflows/flux2-edit.api.json"  # optional
+```
+
+Behavior:
+- If `WORKFLOW_JSON_PATH` is set, that exact JSON file is copied into local `workflows/`.
+- If not set, installer tries to copy `*.json` from repo root, then `repo/workflows/`.
+- The workflow repo clone is temporary (under `tmp/`) and removed automatically; only JSON outputs are kept in `workflows/`.
 
 ## Upgrade
 
