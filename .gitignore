@@ -1,0 +1,11 @@
+.env
+.cache/
+input/
+output/
+tmp/
+models/
+vendor/ComfyUI/input/
+vendor/ComfyUI/output/
+vendor/ComfyUI/temp/
+*.log
+__pycache__/
